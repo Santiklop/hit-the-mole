@@ -24,7 +24,7 @@
       color: #eee;
       min-height: 100vh;
       cursor: default;
-      overflow: hidden;
+      overflow-x: hidden;
       display: flex;
       align-items: center;
       justify-content: center;
@@ -66,7 +66,7 @@
       box-shadow: none;
       backdrop-filter: none;
       max-width: 600px;
-      padding: 16px 10px;
+      padding: 16px 10px 40px;
     }
 
     /* ── Title ── */
@@ -584,6 +584,82 @@
       .paw { width: 28px; height: 15px; }
       #grid { gap: 18px; padding: 10px; }
     }
+
+    /* ── Runaway Mole ── */
+    #runaway-mole {
+      position: fixed;
+      bottom: 120px;
+      z-index: 8000;
+      cursor: pointer;
+      display: none;
+      filter: drop-shadow(0 4px 10px rgba(0,0,0,0.6));
+    }
+    .rm-body { position: relative; width: 90px; animation: rmBob 0.28s ease-in-out infinite; }
+    .rm-head {
+      position: relative;
+      width: 82px; height: 76px;
+      background: radial-gradient(ellipse at 50% 60%, #6b4226 0%, #4a2d14 70%);
+      border-radius: 50% 50% 45% 45%;
+      margin: 0 auto;
+    }
+    .rm-head::before, .rm-head::after {
+      content: '';
+      position: absolute;
+      top: -12px;
+      width: 22px; height: 26px;
+      background: #5c3820;
+      border-radius: 50%;
+    }
+    .rm-head::before { left: 4px; }
+    .rm-head::after  { right: 4px; }
+    .rm-face {
+      position: absolute;
+      top: 10px; left: 50%;
+      transform: translateX(-50%);
+      width: 60px; height: 60px;
+      border-radius: 50%;
+      overflow: hidden;
+      border: 3px solid #3a2010;
+    }
+    .rm-face img { width: 100%; height: 100%; object-fit: cover; }
+    .rm-snout {
+      position: absolute;
+      bottom: 10px; left: 50%;
+      transform: translateX(-50%);
+      width: 26px; height: 14px;
+      background: #c9846a;
+      border-radius: 50%;
+    }
+    .rm-torso {
+      width: 64px; height: 44px;
+      background: radial-gradient(ellipse at 50% 40%, #6b4226 0%, #4a2d14 80%);
+      border-radius: 40% 40% 50% 50%;
+      margin: -6px auto 0;
+    }
+    .rm-legs { display: flex; justify-content: center; gap: 12px; margin-top: -4px; }
+    .rm-leg {
+      width: 18px; height: 30px;
+      background: #5c3820;
+      border-radius: 8px 8px 12px 12px;
+      transform-origin: top center;
+    }
+    @keyframes legSwingFwd  { 0%{transform:rotate(-30deg)} 50%{transform:rotate(30deg)} 100%{transform:rotate(-30deg)} }
+    @keyframes legSwingBack { 0%{transform:rotate(30deg)}  50%{transform:rotate(-30deg)} 100%{transform:rotate(30deg)} }
+    .rm-leg-l { animation: legSwingFwd  0.28s linear infinite; }
+    .rm-leg-r { animation: legSwingBack 0.28s linear infinite; }
+    @keyframes rmBob { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-5px)} }
+    @keyframes kickFlyRight {
+      0%   { transform: translateX(0)    translateY(0)    rotate(0deg)   scale(1);   opacity: 1; }
+      20%  { transform: translateX(30px) translateY(-60px) rotate(45deg)  scale(1.1); opacity: 1; }
+      100% { transform: translateX(120vw) translateY(200px) rotate(720deg) scale(0.3); opacity: 0; }
+    }
+    @keyframes kickFlyLeft {
+      0%   { transform: translateX(0)     translateY(0)    rotate(0deg)    scale(1);   opacity: 1; }
+      20%  { transform: translateX(-30px) translateY(-60px) rotate(-45deg) scale(1.1); opacity: 1; }
+      100% { transform: translateX(-120vw) translateY(200px) rotate(-720deg) scale(0.3); opacity: 0; }
+    }
+    #runaway-mole.kick-right { animation: kickFlyRight 0.7s ease-in forwards; pointer-events: none; }
+    #runaway-mole.kick-left  { animation: kickFlyLeft  0.7s ease-in forwards; pointer-events: none; }
   </style>
 </head>
 <body>
@@ -695,6 +771,10 @@
     let lastHitTime = 0;
     let comboTimeout = null;
     const holes = [];
+    let hitCount = 0;
+    let runawayTimer = null;
+    let runawayActive = false;
+    let runawayDir = 'right';
 
     const hammerEl   = document.getElementById('hammer');
     const scoreEl    = document.getElementById('score');
@@ -771,7 +851,7 @@
     function showHitName(x, y, playerIdx) {
       const el = document.createElement('div');
       el.className = 'hit-name';
-      el.textContent = PLAYER_NAMES[playerIdx] + ' получил пизды!';
+      el.textContent = playerIdx === -1 ? 'Попался, пидорок!' : PLAYER_NAMES[playerIdx] + ' получил пизды!';
       el.style.left = x + 'px';
       el.style.top  = (y - 90) + 'px';
       document.body.appendChild(el);
@@ -842,9 +922,79 @@
       if (timeLeft <= 0) endGame();
     }
 
+    /* ── Runaway mole ── */
+    function scheduleRunaway() {
+      if (runawayTimer) return;
+      runawayTimer = setTimeout(function tick() {
+        if (!spawnTimer) { runawayTimer = null; return; }
+        spawnRunaway();
+        runawayTimer = setTimeout(tick, 7000 + Math.random() * 3000);
+      }, 7000 + Math.random() * 3000);
+    }
+
+    function spawnRunaway() {
+      if (runawayActive) return;
+      runawayActive = true;
+      const rmEl = document.getElementById('runaway-mole');
+      const playerIdx = Math.floor(Math.random() * MOLE_IMGS.length);
+      document.getElementById('rm-img').src = MOLE_IMGS[playerIdx];
+      rmEl.dataset.player = playerIdx;
+      const fromLeft = Math.random() < 0.5;
+      runawayDir = fromLeft ? 'right' : 'left';
+      rmEl.className = '';
+      rmEl.style.transition = 'none';
+      const startX = fromLeft ? -120 : window.innerWidth + 20;
+      const endX   = fromLeft ? window.innerWidth + 20 : -120;
+      rmEl.style.left = startX + 'px';
+      rmEl.style.display = 'block';
+      rmEl.getBoundingClientRect(); // force reflow
+      rmEl.style.transition = 'left 3.5s linear';
+      rmEl.style.left = endX + 'px';
+      rmEl._autoDismiss = setTimeout(dismissRunaway, 3600);
+    }
+
+    function dismissRunaway() {
+      runawayActive = false;
+      const rmEl = document.getElementById('runaway-mole');
+      clearTimeout(rmEl._autoDismiss);
+      rmEl.style.transition = 'none';
+      rmEl.style.display = 'none';
+      rmEl.className = '';
+    }
+
+    function playKickSound() {
+      try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        const bufSize = Math.floor(ctx.sampleRate * 0.4);
+        const buf = ctx.createBuffer(1, bufSize, ctx.sampleRate);
+        const data = buf.getChannelData(0);
+        for (let i = 0; i < bufSize; i++) data[i] = (Math.random()*2-1) * Math.pow(1-i/bufSize, 1.5);
+        const src = ctx.createBufferSource(); src.buffer = buf;
+        const bpf = ctx.createBiquadFilter(); bpf.type = 'bandpass'; bpf.Q.value = 0.8;
+        bpf.frequency.setValueAtTime(2000, ctx.currentTime);
+        bpf.frequency.exponentialRampToValueAtTime(200, ctx.currentTime + 0.35);
+        const g = ctx.createGain();
+        g.gain.setValueAtTime(1.2, ctx.currentTime);
+        g.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.4);
+        src.connect(bpf); bpf.connect(g); g.connect(ctx.destination); src.start();
+        const osc = ctx.createOscillator(); const tg = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(180, ctx.currentTime + 0.15);
+        osc.frequency.exponentialRampToValueAtTime(40, ctx.currentTime + 0.45);
+        tg.gain.setValueAtTime(0, ctx.currentTime + 0.14);
+        tg.gain.linearRampToValueAtTime(1.5, ctx.currentTime + 0.17);
+        tg.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.5);
+        osc.connect(tg); tg.connect(ctx.destination);
+        osc.start(ctx.currentTime + 0.15); osc.stop(ctx.currentTime + 0.5);
+      } catch(e) {}
+    }
+
     /* ── Game lifecycle ── */
     function startGame() {
       score = 0; timeLeft = TOTAL_TIME; combo = 0; lastHitTime = 0; currentSpawnInterval = null;
+      hitCount = 0; runawayActive = false; clearTimeout(runawayTimer); runawayTimer = null;
+      const rmEl = document.getElementById('runaway-mole');
+      rmEl.style.display = 'none'; rmEl.className = ''; rmEl.style.transition = 'none'; rmEl.style.left = '';
       scoreEl.textContent = 0;
       bestEl.textContent  = best;
       timerEl.textContent = TOTAL_TIME;
@@ -866,6 +1016,9 @@
       activeTimeouts.forEach(clearTimeout);
       activeTimeouts = [];
       holes.forEach(h => h.classList.remove('up', 'hit', 'bonking'));
+      hitCount = 0; runawayActive = false; clearTimeout(runawayTimer); runawayTimer = null;
+      const rmElEnd = document.getElementById('runaway-mole');
+      rmElEnd.style.display = 'none'; rmElEnd.className = '';
       const isRecord = score > best;
       if (isRecord) { best = score; localStorage.setItem('mole_best', best); document.getElementById('start-best').textContent = best; }
       document.getElementById('final-score').textContent = score;
@@ -958,6 +1111,8 @@
           score += pts;
           scoreEl.textContent = score;
           popScoreEl();
+          hitCount++;
+          if (hitCount === 4) scheduleRunaway();
 
           if (score > best) {
             best = score;
@@ -980,7 +1135,41 @@
 
       document.getElementById('btn-start').addEventListener('click', startGame);
       document.getElementById('btn-restart').addEventListener('click', startGame);
+      document.getElementById('runaway-mole').addEventListener('click', function() {
+        if (!runawayActive) return;
+        runawayActive = false;
+        const rmEl = this;
+        clearTimeout(rmEl._autoDismiss);
+        rmEl.style.transition = 'none';
+        playKickSound();
+        const rect = rmEl.getBoundingClientRect();
+        showHitName(rect.left + rect.width / 2, rect.top, -1);
+        score += 10;
+        document.getElementById('score').textContent = score;
+        if (score > best) {
+          best = score;
+          localStorage.setItem('mole_best', best);
+          document.getElementById('best').textContent = best;
+          document.getElementById('start-best').textContent = best;
+        }
+        rmEl.className = runawayDir === 'right' ? 'kick-right' : 'kick-left';
+        setTimeout(() => { rmEl.style.display = 'none'; rmEl.className = ''; }, 750);
+      });
     });
   </script>
+
+  <div id="runaway-mole" aria-hidden="true">
+    <div class="rm-body">
+      <div class="rm-head">
+        <div class="rm-face"><img id="rm-img" src="" alt=""></div>
+        <div class="rm-snout"></div>
+      </div>
+      <div class="rm-torso"></div>
+      <div class="rm-legs">
+        <div class="rm-leg rm-leg-l"></div>
+        <div class="rm-leg rm-leg-r"></div>
+      </div>
+    </div>
+  </div>
 </body>
 </html>
