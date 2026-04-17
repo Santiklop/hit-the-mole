@@ -785,7 +785,7 @@
   <!-- START SCREEN -->
   <div id="screen-start" class="screen active">
     <h1>Бей крота!</h1>
-    <p class="subtitle">60 секунд. Быстрее — больше очков!<br>Комбо-удары приносят бонусы 🔥</p>
+    <p class="subtitle">30 секунд. Быстрее — больше очков!<br>Комбо-удары приносят бонусы 🔥</p>
     <div class="hs-card">
       <div class="hs-label">Рекорд</div>
       <div class="hs-val" id="start-best">0</div>
@@ -807,7 +807,7 @@
       </div>
       <div class="hud-block hud-timer" id="timer-block">
         <span class="hud-label">Время</span>
-        <span id="timer">60</span>
+        <span id="timer">30</span>
       </div>
     </div>
     <div id="timer-bar-wrap">
@@ -847,13 +847,13 @@
 
     const PLAYER_NAMES = ['Жека', 'Димон', 'Тоха', 'Ванек'];
 
-    const TOTAL_TIME   = 60;
+    const TOTAL_TIME   = 30;
     const HOLES_COUNT  = 9;
     const COMBO_WINDOW = 1400;
     const DIFFICULTY   = [
-      { above: 45, spawn: 1250, visible: 950 },
-      { above: 30, spawn:  970, visible: 780 },
-      { above: 15, spawn:  760, visible: 620 },
+      { above: 22, spawn: 1250, visible: 950 },
+      { above: 15, spawn:  970, visible: 780 },
+      { above:  7, spawn:  760, visible: 620 },
       { above:  0, spawn:  540, visible: 460 },
     ];
 
@@ -889,6 +889,12 @@
     });
     document.addEventListener('mousedown', () => hammerEl.classList.add('swing'));
     document.addEventListener('mouseup',   () => hammerEl.classList.remove('swing'));
+
+    /* Miss sound: clicks on the grid that don't land on a raised mole */
+    gridEl.addEventListener('mousedown', e => {
+      const hole = e.target.closest('.hole');
+      if (!hole || !hole.classList.contains('up')) playMissSound();
+    });
 
     /* Show hammer only over the grid */
     gridEl.addEventListener('mouseenter', () => {
@@ -1015,7 +1021,7 @@
       timeLeft--;
       timerEl.textContent = timeLeft;
       timerBar.style.width = (timeLeft / TOTAL_TIME * 100) + '%';
-      if (timeLeft <= 10) timerBlock.classList.add('warning');
+      if (timeLeft <= 7) timerBlock.classList.add('warning');
       updateSpawnRate();
       if (timeLeft <= 0) endGame();
     }
@@ -1060,9 +1066,68 @@
       rmEl.className = '';
     }
 
-    function playKickSound() {
+    let _audioCtx = null;
+    function getAudioCtx() {
+      if (!_audioCtx) {
+        try { _audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch(e) { return null; }
+      }
+      if (_audioCtx.state === 'suspended') _audioCtx.resume();
+      return _audioCtx;
+    }
+
+    function playSmashSound() {
+      const ctx = getAudioCtx(); if (!ctx) return;
       try {
-        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        const t = ctx.currentTime;
+        const bufSize = Math.floor(ctx.sampleRate * 0.18);
+        const buf = ctx.createBuffer(1, bufSize, ctx.sampleRate);
+        const data = buf.getChannelData(0);
+        for (let i = 0; i < bufSize; i++) data[i] = (Math.random()*2-1) * Math.pow(1-i/bufSize, 2.2);
+        const src = ctx.createBufferSource(); src.buffer = buf;
+        const hpf = ctx.createBiquadFilter(); hpf.type = 'highpass'; hpf.frequency.value = 900;
+        const ng = ctx.createGain();
+        ng.gain.setValueAtTime(0.9, t);
+        ng.gain.exponentialRampToValueAtTime(0.01, t + 0.18);
+        src.connect(hpf); hpf.connect(ng); ng.connect(ctx.destination); src.start(t);
+
+        const osc = ctx.createOscillator(); const og = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(220, t);
+        osc.frequency.exponentialRampToValueAtTime(55, t + 0.18);
+        og.gain.setValueAtTime(0.9, t);
+        og.gain.exponentialRampToValueAtTime(0.01, t + 0.22);
+        osc.connect(og); og.connect(ctx.destination);
+        osc.start(t); osc.stop(t + 0.24);
+      } catch(e) {}
+    }
+
+    function playMissSound() {
+      const ctx = getAudioCtx(); if (!ctx) return;
+      try {
+        const t = ctx.currentTime;
+        const dur = 0.22;
+        const bufSize = Math.floor(ctx.sampleRate * dur);
+        const buf = ctx.createBuffer(1, bufSize, ctx.sampleRate);
+        const data = buf.getChannelData(0);
+        for (let i = 0; i < bufSize; i++) {
+          const env = Math.sin(Math.PI * i / bufSize);
+          data[i] = (Math.random()*2-1) * env * 0.9;
+        }
+        const src = ctx.createBufferSource(); src.buffer = buf;
+        const bpf = ctx.createBiquadFilter(); bpf.type = 'bandpass'; bpf.Q.value = 1.2;
+        bpf.frequency.setValueAtTime(1200, t);
+        bpf.frequency.exponentialRampToValueAtTime(400, t + dur);
+        const g = ctx.createGain();
+        g.gain.setValueAtTime(0.5, t);
+        g.gain.exponentialRampToValueAtTime(0.01, t + dur);
+        src.connect(bpf); bpf.connect(g); g.connect(ctx.destination);
+        src.start(t); src.stop(t + dur);
+      } catch(e) {}
+    }
+
+    function playKickSound() {
+      const ctx = getAudioCtx(); if (!ctx) return;
+      try {
         const bufSize = Math.floor(ctx.sampleRate * 0.4);
         const buf = ctx.createBuffer(1, bufSize, ctx.sampleRate);
         const data = buf.getChannelData(0);
@@ -1085,6 +1150,120 @@
         osc.connect(tg); tg.connect(ctx.destination);
         osc.start(ctx.currentTime + 0.15); osc.stop(ctx.currentTime + 0.5);
       } catch(e) {}
+    }
+
+    /* ── Kalinka music (quiet during game, loud dance version at end) ── */
+    function playKalinka({ bpm = 110, volume = 0.08, melodyType = 'triangle', addClaps = false } = {}) {
+      const ctx = getAudioCtx(); if (!ctx) return null;
+      const beat = 60 / bpm;
+      const N = {
+        D3: 146.83, F3: 174.61, A3: 220,
+        D4: 293.66, E4: 329.63, F4: 349.23, G4: 392, A4: 440, C5: 523.25,
+      };
+      // Kalinka Malinka chorus (D minor)
+      const melody = [
+        ['A4', 0.25], ['A4', 0.25], ['A4', 0.5],
+        ['A4', 0.25], ['A4', 0.25], ['A4', 0.5],
+        ['A4', 0.25], ['G4', 0.25], ['F4', 0.5],
+        ['E4', 0.5], ['D4', 0.5],
+        ['D4', 0.25], ['E4', 0.25], ['F4', 0.25], ['G4', 0.25],
+        ['A4', 0.5], ['A4', 0.5],
+        ['A4', 0.25], ['G4', 0.25], ['F4', 0.25], ['E4', 0.25],
+        ['D4', 1],
+        ['F4', 0.5], ['E4', 0.5],
+        ['D4', 1],
+      ];
+      const bass = [
+        ['D3', 1], ['A3', 1], ['D3', 1], ['A3', 1],
+        ['D3', 1], ['A3', 1], ['D3', 1], ['A3', 1],
+        ['D3', 1], ['A3', 1],
+      ];
+
+      const masterGain = ctx.createGain();
+      masterGain.gain.value = volume;
+      masterGain.connect(ctx.destination);
+
+      function playNote(freq, start, dur, type, vol) {
+        const osc = ctx.createOscillator();
+        const g = ctx.createGain();
+        osc.type = type;
+        osc.frequency.value = freq;
+        g.gain.setValueAtTime(0.0001, start);
+        g.gain.exponentialRampToValueAtTime(vol, start + 0.015);
+        g.gain.setValueAtTime(vol, start + dur * 0.6);
+        g.gain.exponentialRampToValueAtTime(0.0001, start + dur);
+        osc.connect(g); g.connect(masterGain);
+        osc.start(start); osc.stop(start + dur + 0.05);
+      }
+
+      function playClap(start) {
+        const bufSize = Math.floor(ctx.sampleRate * 0.08);
+        const buf = ctx.createBuffer(1, bufSize, ctx.sampleRate);
+        const d = buf.getChannelData(0);
+        for (let i = 0; i < bufSize; i++) d[i] = (Math.random()*2-1) * Math.pow(1-i/bufSize, 2);
+        const src = ctx.createBufferSource(); src.buffer = buf;
+        const hpf = ctx.createBiquadFilter(); hpf.type = 'highpass'; hpf.frequency.value = 1500;
+        const g = ctx.createGain(); g.gain.value = 0.5;
+        src.connect(hpf); hpf.connect(g); g.connect(masterGain);
+        src.start(start);
+      }
+
+      const barLen = 10 * beat;
+      let running = true;
+
+      function scheduleBar(startTime) {
+        if (!running) return;
+        let t = startTime;
+        for (const [note, d] of melody) {
+          playNote(N[note], t, d * beat * 0.9, melodyType, 0.28);
+          t += d * beat;
+        }
+        t = startTime;
+        for (const [note, d] of bass) {
+          playNote(N[note], t, d * beat * 0.95, 'triangle', 0.34);
+          t += d * beat;
+        }
+        if (addClaps) {
+          for (let i = 0; i < 10; i += 2) playClap(startTime + (i + 1) * beat);
+        }
+      }
+
+      let nextTime = ctx.currentTime + 0.1;
+      scheduleBar(nextTime);
+      const loopInterval = setInterval(() => {
+        nextTime += barLen;
+        scheduleBar(nextTime);
+      }, barLen * 1000 * 0.9);
+
+      return () => {
+        running = false;
+        clearInterval(loopInterval);
+        const now = ctx.currentTime;
+        try {
+          masterGain.gain.cancelScheduledValues(now);
+          masterGain.gain.setValueAtTime(masterGain.gain.value, now);
+          masterGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.2);
+        } catch(e) {}
+        setTimeout(() => { try { masterGain.disconnect(); } catch(e) {} }, 300);
+      };
+    }
+
+    let _gameMusicStop = null;
+    let _endMusicStop = null;
+
+    function playGameMusic() {
+      stopGameMusic();
+      _gameMusicStop = playKalinka({ bpm: 108, volume: 0.07, melodyType: 'triangle', addClaps: false });
+    }
+    function stopGameMusic() {
+      if (_gameMusicStop) { _gameMusicStop(); _gameMusicStop = null; }
+    }
+    function playEndMusic() {
+      stopEndMusic();
+      _endMusicStop = playKalinka({ bpm: 168, volume: 0.45, melodyType: 'square', addClaps: true });
+    }
+    function stopEndMusic() {
+      if (_endMusicStop) { _endMusicStop(); _endMusicStop = null; }
     }
 
     /* ── Fireworks ── */
@@ -1168,17 +1347,20 @@
       comboEl.classList.remove('show');
       holes.forEach(h => h.classList.remove('up', 'hit', 'bonking'));
       stopFireworks();
+      stopEndMusic();
       showScreen('screen-game');
       const { spawn } = getDiff();
       currentSpawnInterval = spawn;
       spawnMole();
       spawnTimer = setInterval(spawnMole, spawn);
       countdownTimer = setInterval(tick, 1000);
+      playGameMusic();
     }
 
     function endGame() {
       clearInterval(spawnTimer);
       clearInterval(countdownTimer);
+      stopGameMusic();
       activeTimeouts.forEach(clearTimeout);
       activeTimeouts = [];
       holes.forEach(h => h.classList.remove('up', 'hit', 'bonking'));
@@ -1193,6 +1375,7 @@
       document.querySelectorAll('.dm-img').forEach((img, i) => { img.src = MOLE_IMGS[i]; });
       showScreen('screen-over');
       startFireworks();
+      playEndMusic();
     }
 
     function showScreen(id) {
@@ -1268,6 +1451,7 @@
           const cx = rect.left + rect.width  / 2;
           const cy = rect.top  + rect.height / 2;
 
+          playSmashSound();
           hole.classList.remove('up');
           hole.classList.add('bonking');
           hole.addEventListener('animationend', () => hole.classList.remove('bonking'), { once: true });
