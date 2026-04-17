@@ -671,9 +671,88 @@
     }
     #runaway-mole.kick-right { animation: kickFlyRight 0.7s ease-in forwards; pointer-events: none; }
     #runaway-mole.kick-left  { animation: kickFlyLeft  0.7s ease-in forwards; pointer-events: none; }
+
+    /* ── Fireworks canvas ── */
+    #fireworks-canvas {
+      position: fixed; inset: 0;
+      width: 100%; height: 100%;
+      z-index: 500; pointer-events: none; display: none;
+    }
+
+    /* ── Game-over screen above fireworks ── */
+    #screen-over { z-index: 600; background: rgba(8,24,8,0.78); }
+
+    /* ── Dancing moles on game-over screen ── */
+    #dance-moles {
+      display: flex;
+      justify-content: center;
+      align-items: flex-end;
+      gap: 14px;
+      margin: 4px 0 -4px;
+    }
+    .dance-mole {
+      display: flex; flex-direction: column; align-items: center;
+      animation: moleDance 0.72s ease-in-out infinite;
+      transform-origin: center bottom;
+    }
+    .dance-mole:nth-child(2) { animation-delay: 0.18s; }
+    .dance-mole:nth-child(3) { animation-delay: 0.36s; }
+    .dance-mole:nth-child(4) { animation-delay: 0.54s; }
+    @keyframes moleDance {
+      0%   { transform: translateY(0)    rotate(0deg)   scale(1); }
+      18%  { transform: translateY(-18px) rotate(-12deg) scale(1.07); }
+      40%  { transform: translateY(-6px)  rotate(6deg)  scale(0.96); }
+      58%  { transform: translateY(-22px) rotate(12deg) scale(1.1); }
+      80%  { transform: translateY(-4px)  rotate(-6deg) scale(0.96); }
+      100% { transform: translateY(0)    rotate(0deg)   scale(1); }
+    }
+    .dm-head {
+      position: relative;
+      width: 72px; height: 66px;
+      background: radial-gradient(ellipse at 42% 32%, #9e6e3a 0%, #7a4e28 38%, #4d2e12 75%, #2d1808 100%);
+      border-radius: 50% 50% 46% 46% / 54% 54% 46% 46%;
+      display: flex; flex-direction: column; align-items: center;
+      padding-top: 4px;
+      box-shadow: inset 0 -8px 16px rgba(0,0,0,0.5), 0 4px 10px rgba(0,0,0,0.6);
+    }
+    .dm-head::before, .dm-head::after {
+      content: ''; position: absolute; top: -10px;
+      width: 18px; height: 22px;
+      background: radial-gradient(ellipse at 50% 38%, #7a4e28 0%, #4d2e12 55%, #2d1808 100%);
+      border-radius: 50%;
+    }
+    .dm-head::before { left: 10px; transform: rotate(-10deg); }
+    .dm-head::after  { right: 10px; transform: rotate(10deg); }
+    .dm-face {
+      width: 56px; height: 56px; border-radius: 50%; overflow: hidden;
+      border: 2px solid #7a4e28;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.5); flex-shrink: 0;
+    }
+    .dm-face img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .dm-snout {
+      width: 20px; height: 11px;
+      background: radial-gradient(ellipse at 50% 28%, #eebbcc, #c87898, #a05070);
+      border-radius: 50%; display: flex; justify-content: center; gap: 5px; align-items: center;
+      margin-top: 2px; flex-shrink: 0;
+    }
+    .dm-feet { display: flex; gap: 6px; margin-top: 3px; }
+    .dm-foot {
+      width: 22px; height: 10px;
+      background: radial-gradient(ellipse at 50% 38%, #9e6e3a, #5a3418);
+      border-radius: 40% 40% 50% 50%;
+      transform-origin: top center;
+    }
+    .dance-mole:nth-child(odd)  .dm-foot:first-child { animation: dmFootL 0.36s ease-in-out infinite alternate; }
+    .dance-mole:nth-child(odd)  .dm-foot:last-child  { animation: dmFootR 0.36s ease-in-out infinite alternate; }
+    .dance-mole:nth-child(even) .dm-foot:first-child { animation: dmFootR 0.36s ease-in-out infinite alternate; }
+    .dance-mole:nth-child(even) .dm-foot:last-child  { animation: dmFootL 0.36s ease-in-out infinite alternate; }
+    @keyframes dmFootL { to { transform: rotate(-20deg) translateX(-3px); } }
+    @keyframes dmFootR { to { transform: rotate(20deg)  translateX(3px);  } }
   </style>
 </head>
 <body>
+
+  <canvas id="fireworks-canvas"></canvas>
 
   <!-- Hammer cursor -->
   <div id="hammer">
@@ -747,6 +826,12 @@
       <div class="result-label">Твой счёт</div>
       <div class="result-score" id="final-score">0</div>
       <div class="result-best">Рекорд: <span id="best-over">0</span></div>
+    </div>
+    <div id="dance-moles">
+      <div class="dance-mole"><div class="dm-head"><div class="dm-face"><img class="dm-img" src="" alt=""></div><div class="dm-snout"><span class="nostril"></span><span class="nostril"></span></div></div><div class="dm-feet"><div class="dm-foot"></div><div class="dm-foot"></div></div></div>
+      <div class="dance-mole"><div class="dm-head"><div class="dm-face"><img class="dm-img" src="" alt=""></div><div class="dm-snout"><span class="nostril"></span><span class="nostril"></span></div></div><div class="dm-feet"><div class="dm-foot"></div><div class="dm-foot"></div></div></div>
+      <div class="dance-mole"><div class="dm-head"><div class="dm-face"><img class="dm-img" src="" alt=""></div><div class="dm-snout"><span class="nostril"></span><span class="nostril"></span></div></div><div class="dm-feet"><div class="dm-foot"></div><div class="dm-foot"></div></div></div>
+      <div class="dance-mole"><div class="dm-head"><div class="dm-face"><img class="dm-img" src="" alt=""></div><div class="dm-snout"><span class="nostril"></span><span class="nostril"></span></div></div><div class="dm-feet"><div class="dm-foot"></div><div class="dm-foot"></div></div></div>
     </div>
     <button id="btn-restart">Играть снова</button>
   </div>
@@ -1001,6 +1086,73 @@
       } catch(e) {}
     }
 
+    /* ── Fireworks ── */
+    let fwAnimId = null;
+    const fwParticles = [];
+
+    function startFireworks() {
+      const canvas = document.getElementById('fireworks-canvas');
+      canvas.width  = window.innerWidth;
+      canvas.height = window.innerHeight;
+      canvas.style.display = 'block';
+      const ctx = canvas.getContext('2d');
+      let lastLaunch = -999;
+      function loop(ts) {
+        ctx.fillStyle = 'rgba(0,0,0,0.14)';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        if (ts - lastLaunch > 550 + Math.random() * 350) {
+          launchFirework(ctx, canvas.width, canvas.height);
+          lastLaunch = ts;
+        }
+        for (let i = fwParticles.length - 1; i >= 0; i--) {
+          const p = fwParticles[i];
+          p.x += p.vx; p.y += p.vy;
+          p.vy += 0.055; p.vx *= 0.98; p.vy *= 0.98;
+          p.life--;
+          if (p.life <= 0) { fwParticles.splice(i, 1); continue; }
+          const a = p.life / p.maxLife;
+          ctx.globalAlpha = a * 0.9;
+          ctx.fillStyle = p.color;
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, p.r * (0.4 + 0.6 * a), 0, Math.PI * 2);
+          ctx.fill();
+        }
+        ctx.globalAlpha = 1;
+        fwAnimId = requestAnimationFrame(loop);
+      }
+      fwAnimId = requestAnimationFrame(loop);
+    }
+
+    function launchFirework(ctx, w, h) {
+      const x = 60 + Math.random() * (w - 120);
+      const y = 30 + Math.random() * (h * 0.55);
+      const hue = Math.floor(Math.random() * 360);
+      const c1 = `hsl(${hue},100%,65%)`, c2 = `hsl(${(hue+50)%360},100%,70%)`;
+      const count = 70 + Math.random() * 50;
+      for (let i = 0; i < count; i++) {
+        const angle = (Math.PI * 2 * i / count) + (Math.random() - 0.5) * 0.4;
+        const spd   = 1.5 + Math.random() * 3.5;
+        fwParticles.push({
+          x, y,
+          vx: Math.cos(angle) * spd,
+          vy: Math.sin(angle) * spd - 0.8,
+          color: Math.random() < 0.5 ? c1 : c2,
+          r: 2 + Math.random() * 2,
+          life: 55 + Math.random() * 55,
+          maxLife: 110,
+        });
+      }
+    }
+
+    function stopFireworks() {
+      cancelAnimationFrame(fwAnimId);
+      fwAnimId = null;
+      fwParticles.length = 0;
+      const canvas = document.getElementById('fireworks-canvas');
+      canvas.style.display = 'none';
+      canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height);
+    }
+
     /* ── Game lifecycle ── */
     function startGame() {
       score = 0; timeLeft = TOTAL_TIME; combo = 0; lastHitTime = 0; currentSpawnInterval = null;
@@ -1014,6 +1166,7 @@
       timerBlock.classList.remove('warning');
       comboEl.classList.remove('show');
       holes.forEach(h => h.classList.remove('up', 'hit', 'bonking'));
+      stopFireworks();
       showScreen('screen-game');
       const { spawn } = getDiff();
       currentSpawnInterval = spawn;
@@ -1036,7 +1189,9 @@
       document.getElementById('final-score').textContent = score;
       document.getElementById('best-over').textContent   = best;
       document.getElementById('new-record').classList.toggle('show', isRecord);
+      document.querySelectorAll('.dm-img').forEach((img, i) => { img.src = MOLE_IMGS[i]; });
       showScreen('screen-over');
+      startFireworks();
     }
 
     function showScreen(id) {
